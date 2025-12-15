@@ -42,15 +42,15 @@ POST /v1/jobs
 Content-Type: application/json
 
 {
-  "tenantId": "t_abc",
+  "userId": "user_abc",
   "jobId": "job_123",
   "input": {
     "bucket": "slides-prod",
-    "key": "users/t_abc/jobs/job_123/input/deck.pptx"
+    "key": "users/user_abc/jobs/job_123/input/deck.pptx"
   },
   "output": {
     "bucket": "slides-prod",
-    "key": "users/t_abc/jobs/job_123/output/"
+    "key": "users/user_abc/jobs/job_123/output/"
   }
 }
 ```
@@ -66,18 +66,18 @@ Content-Type: application/json
 ### Get Job Status
 
 ```http
-GET /v1/jobs/{jobId}?tenantId=t_abc
+GET /v1/jobs/{jobId}?userId=user_abc
 ```
 
 **Response:**
 ```json
 {
   "jobId": "job_123",
-  "userId": "t_abc",
+  "userId": "user_abc",
   "status": "succeeded",
   "manifest": {
     "bucket": "slides-prod",
-    "key": "users/t_abc/jobs/job_123/output/manifest.json"
+    "key": "users/user_abc/jobs/job_123/output/manifest.json"
   }
 }
 ```
@@ -107,12 +107,12 @@ GET /ready
 ```json
 {
   "jobId": "job_123",
-  "userId": "t_abc",
+  "userId": "user_abc",
   "status": "succeeded",
   "pageCount": 28,
   "pages": [
-    { "page": 1, "key": "users/t_abc/jobs/job_123/output/pages/0001.pdf" },
-    { "page": 2, "key": "users/t_abc/jobs/job_123/output/pages/0002.pdf" }
+    { "page": 1, "key": "users/user_abc/jobs/job_123/output/pages/0001.pdf" },
+    { "page": 2, "key": "users/user_abc/jobs/job_123/output/pages/0002.pdf" }
   ]
 }
 ```
@@ -122,7 +122,7 @@ GET /ready
 ```json
 {
   "jobId": "job_123",
-  "userId": "t_abc",
+  "userId": "user_abc",
   "status": "failed",
   "error": {
     "code": "CONVERSION_FAILED",
@@ -161,7 +161,7 @@ GET /ready
    curl -X POST http://localhost:8080/v1/jobs \
      -H "Content-Type: application/json" \
      -d '{
-       "tenantId": "test",
+       "userId": "test",
        "jobId": "job1",
        "input": {
          "bucket": "slides-dev",
@@ -176,7 +176,7 @@ GET /ready
 
 4. **Poll for completion:**
    ```bash
-   curl "http://localhost:8080/v1/jobs/job1?tenantId=test"
+   curl "http://localhost:8080/v1/jobs/job1?userId=test"
    ```
 
 5. **Access output files in MinIO Console:**

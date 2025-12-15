@@ -44,7 +44,7 @@ class ConversionPipeline:
         logger.info(
             "Starting conversion pipeline",
             job_id=job_id,
-            tenant_id=job.tenant_id,
+            user_id=job.user_id,
             input_key=job.input_key,
         )
 
@@ -102,7 +102,7 @@ class ConversionPipeline:
             # Write success manifest LAST
             manifest = SuccessManifest(
                 jobId=job_id,
-                userId=job.tenant_id,
+                userId=job.user_id,
                 status="succeeded",
                 pageCount=page_count,
                 pages=page_infos,
@@ -179,7 +179,7 @@ class ConversionPipeline:
         try:
             manifest = FailureManifest(
                 jobId=job.job_id,
-                userId=job.tenant_id,
+                userId=job.user_id,
                 status="failed",
                 error=ErrorInfo(code=error_code, message=error_message),
             )

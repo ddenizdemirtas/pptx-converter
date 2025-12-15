@@ -33,7 +33,7 @@ async def create_job(
     logger.info(
         "Received job creation request",
         job_id=request.jobId,
-        tenant_id=request.tenantId,
+        user_id=request.userId,
         input_key=request.input.key,
     )
 
@@ -50,7 +50,7 @@ async def create_job(
     # Create new job
     job = await job_manager.create_job(
         job_id=request.jobId,
-        tenant_id=request.tenantId,
+        user_id=request.userId,
         input_bucket=request.input.bucket,
         input_key=request.input.key,
         output_bucket=request.output.bucket,
@@ -78,7 +78,7 @@ async def create_job(
 @router.get("/jobs/{job_id}", response_model=GetJobResponse)
 async def get_job(
     job_id: str,
-    tenantId: str = Query(..., description="Tenant identifier"),
+    userId: str = Query(..., description="User identifier"),
 ) -> GetJobResponse:
     """
     Get the status of a conversion job.
@@ -90,8 +90,8 @@ async def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Verify tenant matches (basic authorization)
-    if job.tenant_id != tenantId:
+    # Verify user matches (basic authorization)
+    if job.user_id != userId:
         raise HTTPException(status_code=404, detail="Job not found")
 
     # Build manifest location if job is complete
@@ -104,7 +104,7 @@ async def get_job(
 
     return GetJobResponse(
         jobId=job.job_id,
-        userId=job.tenant_id,
+        userId=job.user_id,
         status=job.status,
         manifest=manifest,
     )

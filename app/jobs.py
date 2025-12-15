@@ -34,7 +34,7 @@ class JobManager:
     async def create_job(
         self,
         job_id: str,
-        tenant_id: str,
+        user_id: str,
         input_bucket: str,
         input_key: str,
         output_bucket: str,
@@ -45,7 +45,7 @@ class JobManager:
 
         Args:
             job_id: Unique job identifier
-            tenant_id: Tenant identifier
+            user_id: User identifier
             input_bucket: S3 bucket for input PPTX
             input_key: S3 key for input PPTX
             output_bucket: S3 bucket for output
@@ -61,7 +61,7 @@ class JobManager:
 
             job = Job(
                 job_id=job_id,
-                tenant_id=tenant_id,
+                user_id=user_id,
                 status=JobStatus.QUEUED,
                 input_bucket=input_bucket,
                 input_key=input_key,
@@ -73,7 +73,7 @@ class JobManager:
             logger.info(
                 "Job created",
                 job_id=job_id,
-                tenant_id=tenant_id,
+                user_id=user_id,
                 status=job.status,
             )
 

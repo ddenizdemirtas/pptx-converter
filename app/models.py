@@ -29,7 +29,7 @@ class S3Ref(BaseModel):
 class CreateJobRequest(BaseModel):
     """Request body for POST /v1/jobs."""
 
-    tenantId: str = Field(..., description="Tenant identifier")
+    userId: str = Field(..., description="User identifier")
     jobId: str = Field(..., description="Unique job identifier")
     input: S3Ref = Field(..., description="S3 location of input PPTX")
     output: S3Ref = Field(..., description="S3 output prefix for results")
@@ -100,7 +100,7 @@ class Job(BaseModel):
     """Internal representation of a conversion job."""
 
     job_id: str
-    tenant_id: str
+    user_id: str
     status: JobStatus
     input_bucket: str
     input_key: str
