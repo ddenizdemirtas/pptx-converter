@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+*.egg-info
+.mypy_cache
+.pytest_cache
+
+# IDE
+.idea
+.vscode
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Docs
+*.md
+LICENSE
+
+# Dev files
+.env*
+!.env.example
+tests/
+
