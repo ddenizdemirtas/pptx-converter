@@ -63,7 +63,7 @@ class ConversionPipeline:
             input_path = input_dir / "deck.pptx"
             await asyncio.to_thread(
                 s3_client.download_file,
-                job.input_bucket,
+                settings.s3_bucket,
                 job.input_key,
                 input_path,
             )
@@ -93,7 +93,7 @@ class ConversionPipeline:
                 await asyncio.to_thread(
                     s3_client.upload_file,
                     page_path,
-                    job.output_bucket,
+                    settings.s3_bucket,
                     page_key,
                 )
 
@@ -112,7 +112,7 @@ class ConversionPipeline:
             await asyncio.to_thread(
                 s3_client.upload_json,
                 manifest.model_dump_json(indent=2),
-                job.output_bucket,
+                settings.s3_bucket,
                 manifest_key,
             )
 
@@ -188,7 +188,7 @@ class ConversionPipeline:
             await asyncio.to_thread(
                 s3_client.upload_json,
                 manifest.model_dump_json(indent=2),
-                job.output_bucket,
+                settings.s3_bucket,
                 manifest_key,
             )
 

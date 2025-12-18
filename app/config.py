@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     s3_endpoint_url: str | None = Field(
         default=None, description="Custom S3 endpoint (for MinIO/LocalStack)"
     )
+    s3_bucket: str = Field(
+        ..., description="S3 bucket for input/output files"
+    )
 
     model_config = {
         "env_prefix": "",

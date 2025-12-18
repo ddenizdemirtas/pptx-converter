@@ -23,14 +23,17 @@ A containerized microservice that converts PowerPoint (PPTX) files to PDF using 
        │  GET /v1/jobs/{id}                    │
        │  (poll until succeeded/failed)        │
        ▼                                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                          S3                             │
-│                                                         │
-│  users/{userId}/jobs/{jobId}/input/deck.pptx           │
-│  users/{userId}/jobs/{jobId}/output/pages/0001.pdf     │
-│  users/{userId}/jobs/{jobId}/output/pages/0002.pdf     │
-│  users/{userId}/jobs/{jobId}/output/manifest.json      │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                          S3 (S3_BUCKET)                          │
+│                                                                  │
+│  INPUT:                                                          │
+│  tenants/{tenantId}/users/{userId}/jobs/{jobId}/input/deck.pptx │
+│                                                                  │
+│  OUTPUT:                                                         │
+│  conversions/{jobId}/pages/0001.pdf                              │
+│  conversions/{jobId}/pages/0002.pdf                              │
+│  conversions/{jobId}/manifest.json                               │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## API Endpoints
@@ -42,18 +45,15 @@ POST /v1/jobs
 Content-Type: application/json
 
 {
+  "tenantId": "test-tenant",
   "userId": "user_abc",
-  "jobId": "job_123",
-  "input": {
-    "bucket": "slides-prod",
-    "key": "users/user_abc/jobs/job_123/input/deck.pptx"
-  },
-  "output": {
-    "bucket": "slides-prod",
-    "key": "users/user_abc/jobs/job_123/output/"
-  }
+  "jobId": "job_123"
 }
 ```
+
+The service constructs S3 paths from these parameters:
+- **Input**: `tenants/{tenantId}/users/{userId}/jobs/{jobId}/input/deck.pptx`
+- **Output**: `conversions/{jobId}/` (manifest, pages)
 
 **Response (immediate):**
 ```json
@@ -76,8 +76,8 @@ GET /v1/jobs/{jobId}?userId=user_abc
   "userId": "user_abc",
   "status": "succeeded",
   "manifest": {
-    "bucket": "slides-prod",
-    "key": "users/user_abc/jobs/job_123/output/manifest.json"
+    "bucket": "my-bucket",
+    "key": "conversions/job_123/manifest.json"
   }
 }
 ```
@@ -111,8 +111,8 @@ GET /ready
   "status": "succeeded",
   "pageCount": 28,
   "pages": [
-    { "page": 1, "key": "users/user_abc/jobs/job_123/output/pages/0001.pdf" },
-    { "page": 2, "key": "users/user_abc/jobs/job_123/output/pages/0002.pdf" }
+    { "page": 1, "key": "conversions/job_123/pages/0001.pdf" },
+    { "page": 2, "key": "conversions/job_123/pages/0002.pdf" }
   ]
 }
 ```
@@ -153,7 +153,7 @@ GET /ready
    ```bash
    # Using MinIO client (mc)
    mc alias set local http://localhost:9000 minioadmin minioadmin
-   mc cp test.pptx local/slides-dev/users/test/jobs/job1/input/deck.pptx
+   mc cp test.pptx local/slides-dev/tenants/test-tenant/users/test-user/jobs/job1/input/deck.pptx
    ```
 
 3. **Start a conversion job:**
@@ -161,22 +161,15 @@ GET /ready
    curl -X POST http://localhost:8080/v1/jobs \
      -H "Content-Type: application/json" \
      -d '{
-       "userId": "test",
-       "jobId": "job1",
-       "input": {
-         "bucket": "slides-dev",
-         "key": "users/test/jobs/job1/input/deck.pptx"
-       },
-       "output": {
-         "bucket": "slides-dev",
-         "key": "users/test/jobs/job1/output/"
-       }
+       "tenantId": "test-tenant",
+       "userId": "test-user",
+       "jobId": "job1"
      }'
    ```
 
 4. **Poll for completion:**
    ```bash
-   curl "http://localhost:8080/v1/jobs/job1?userId=test"
+   curl "http://localhost:8080/v1/jobs/job1?userId=test-user"
    ```
 
 5. **Access output files in MinIO Console:**
@@ -197,6 +190,7 @@ GET /ready
 | `AWS_ACCESS_KEY_ID` | - | AWS access key (optional with IAM role) |
 | `AWS_SECRET_ACCESS_KEY` | - | AWS secret key (optional with IAM role) |
 | `S3_ENDPOINT_URL` | - | Custom S3 endpoint (for MinIO/LocalStack) |
+| `S3_BUCKET` | **required** | S3 bucket for input/output files |
 
 ## Deployment
 
@@ -236,6 +230,8 @@ spec:
               value: "1"
             - name: LOG_LEVEL
               value: "INFO"
+            - name: S3_BUCKET
+              value: "my-bucket"
           resources:
             requests:
               cpu: "500m"
