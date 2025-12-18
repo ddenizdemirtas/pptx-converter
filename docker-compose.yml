@@ -19,7 +19,7 @@ services:
       AWS_REGION: ${AWS_REGION}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      
+      # Uncomment below if using S3-compatible storage (not AWS)a
     volumes:
       # Mount app code for development (hot reload)
       - ./app:/app/app:ro
