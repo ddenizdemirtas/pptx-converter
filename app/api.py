@@ -1,6 +1,7 @@
 """HTTP API endpoints for the conversion service."""
 
 import asyncio
+import os
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 import structlog
 
@@ -17,6 +18,9 @@ from app.pipeline import pipeline
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/v1", tags=["jobs"])
+
+# Detect if running on AWS Lambda
+IS_LAMBDA = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
 
 @router.post("/jobs", response_model=CreateJobResponse)
@@ -57,7 +61,7 @@ async def create_job(
         output_prefix=request.output.key,
     )
 
-    # Schedule background conversion task
+    # Run conversion
     async def run_conversion():
         """Wrapper to run conversion with concurrency control."""
         await job_manager.run_with_concurrency(
@@ -65,14 +69,27 @@ async def create_job(
             task=lambda: pipeline.run(job),
         )
 
-    background_tasks.add_task(run_conversion)
+    if IS_LAMBDA:
+        # On Lambda: run synchronously (background tasks don't work)
+        logger.info("Running conversion synchronously (Lambda mode)",
+                    job_id=job.job_id)
+        await run_conversion()
 
-    logger.info("Job queued for conversion", job_id=job.job_id)
+        # Get final job status
+        final_job = await job_manager.get_job(job.job_id)
+        return CreateJobResponse(
+            jobId=job.job_id,
+            status=final_job.status if final_job else JobStatus.FAILED,
+        )
+    else:
+        # On regular server: use background task
+        background_tasks.add_task(run_conversion)
+        logger.info("Job queued for conversion", job_id=job.job_id)
 
-    return CreateJobResponse(
-        jobId=job.job_id,
-        status=JobStatus.QUEUED,
-    )
+        return CreateJobResponse(
+            jobId=job.job_id,
+            status=JobStatus.QUEUED,
+        )
 
 
 @router.get("/jobs/{job_id}", response_model=GetJobResponse)

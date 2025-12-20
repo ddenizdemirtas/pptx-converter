@@ -2,6 +2,7 @@
 
 import asyncio
 import shutil
+import traceback
 from pathlib import Path
 import structlog
 from app.config import settings
@@ -60,6 +61,7 @@ class ConversionPipeline:
             pages_dir.mkdir(exist_ok=True)
 
             # Step A: Download PPTX from S3
+            logger.debug("Step A: Downloading PPTX from S3", job_id=job_id)
             input_path = input_dir / "deck.pptx"
             await asyncio.to_thread(
                 s3_client.download_file,
@@ -67,6 +69,7 @@ class ConversionPipeline:
                 job.input_key,
                 input_path,
             )
+            logger.debug("Step A complete: PPTX downloaded", job_id=job_id)
 
             # Validate file size
             file_size_mb = input_path.stat().st_size / (1024 * 1024)
@@ -77,14 +80,22 @@ class ConversionPipeline:
                 )
 
             # Step B: Convert PPTX to PDF via LibreOffice
+            logger.debug("Step B: Converting PPTX to PDF", job_id=job_id)
             deck_pdf_path = await converter.convert(input_path, pdf_dir, job_id)
+            logger.debug("Step B complete: PDF generated",
+                         job_id=job_id, pdf_path=str(deck_pdf_path))
 
             # Step C: Split PDF into pages
+            logger.debug("Step C: Splitting PDF into pages", job_id=job_id)
             page_count, page_paths = await asyncio.to_thread(
                 splitter.split, deck_pdf_path, pages_dir
             )
+            logger.debug("Step C complete: PDF split",
+                         job_id=job_id, page_count=page_count)
 
             # Step D: Upload outputs to S3
+            logger.debug("Step D: Uploading pages to S3",
+                         job_id=job_id, page_count=page_count)
             page_infos: list[PageInfo] = []
             for i, page_path in enumerate(page_paths):
                 page_num = i + 1
@@ -99,7 +110,11 @@ class ConversionPipeline:
 
                 page_infos.append(PageInfo(page=page_num, key=page_key))
 
+            logger.debug("Step D complete: All pages uploaded",
+                         job_id=job_id, pages_uploaded=len(page_infos))
+
             # Write success manifest LAST
+            logger.debug("Step E: Writing success manifest", job_id=job_id)
             manifest = SuccessManifest(
                 jobId=job_id,
                 userId=job.user_id,
@@ -146,10 +161,20 @@ class ConversionPipeline:
             )
 
         except Exception as e:
-            # Unexpected errors
-            logger.exception(
-                "Conversion pipeline failed with unexpected error", job_id=job_id)
-            error_message = str(e)[:500]  # Truncate for manifest
+            # Unexpected errors - log full exception details with traceback
+            full_traceback = traceback.format_exc()
+            logger.error(
+                "Conversion pipeline failed with unexpected error",
+                job_id=job_id,
+                error_type=type(e).__name__,
+                error_str=str(e),
+                traceback=full_traceback,
+            )
+            # Also print to stdout for CloudWatch
+            print(f"[ERROR] Job {job_id} failed with exception:")
+            print(full_traceback)
+
+            error_message = f"{type(e).__name__}: {str(e)}"[:500]
             await self._write_failure_manifest(job, "UNEXPECTED_ERROR", error_message)
             await job_manager.update_job_status(
                 job_id=job_id,
@@ -197,11 +222,16 @@ class ConversionPipeline:
 
         except Exception as e:
             # Log but don't fail - the job is already failed
+            full_traceback = traceback.format_exc()
             logger.error(
                 "Failed to write failure manifest",
                 job_id=job.job_id,
                 error=str(e),
+                traceback=full_traceback,
             )
+            print(
+                f"[ERROR] Failed to write failure manifest for job {job.job_id}:")
+            print(full_traceback)
 
 
 # Global pipeline instance

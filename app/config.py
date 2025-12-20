@@ -31,9 +31,13 @@ class Settings(BaseSettings):
     libreoffice_bin: str = "soffice"
 
     # AWS S3 settings (for local dev, can use MinIO)
-    aws_region: str = "us-east-1"
-    aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
+    # Note: On Lambda, leave these unset - Lambda provides credentials automatically
+    aws_region: str = "us-east-2"
+    # Use S3_ prefix to avoid conflict with Lambda's reserved AWS_* env vars
+    s3_access_key_id: str | None = Field(
+        default=None, alias="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str | None = Field(
+        default=None, alias="S3_SECRET_ACCESS_KEY")
     s3_endpoint_url: str | None = Field(
         default=None, description="Custom S3 endpoint (for MinIO/LocalStack)"
     )
@@ -43,6 +47,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
+        "populate_by_name": True,
     }
 
 

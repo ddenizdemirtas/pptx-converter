@@ -1,8 +1,8 @@
 # PPTX Converter Service - AWS Lambda Container Image
-# Based on AWS Lambda Python base image with LibreOffice added
+# Uses Debian base (for LibreOffice) with Lambda Runtime Interface Client
 
 # =============================================================================
-# Stage 1: Build LibreOffice layer
+# Stage 1: Build Python dependencies
 # =============================================================================
 FROM python:3.12-slim AS builder
 
@@ -17,53 +17,60 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
+# Also build the Lambda runtime interface client
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels awslambdaric
+
 # =============================================================================
-# Stage 2: Lambda runtime image
+# Stage 2: Final Lambda image
 # =============================================================================
-FROM public.ecr.aws/lambda/python:3.12
+FROM python:3.12-slim
 
 # Labels
 LABEL org.opencontainers.image.title="PPTX Converter Service (Lambda)"
 LABEL org.opencontainers.image.description="Converts PPTX files to PDF using LibreOffice - Lambda version"
 
-# Install LibreOffice and fonts
-# Note: Lambda base image uses Amazon Linux 2023, LibreOffice requires EPEL
-# Lambda image has curl-minimal pre-installed, use it directly (don't install full curl - conflicts!)
-RUN curl -LO https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
-    && rpm -ivh epel-release-latest-9.noarch.rpm \
-    && rm -f epel-release-latest-9.noarch.rpm \
-    # Install LibreOffice from EPEL
-    && dnf install -y \
+WORKDIR /var/task
+
+# Install LibreOffice and fonts (Debian packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-impress \
     libreoffice-writer \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
     fontconfig \
-    # Install available fonts (ignore errors for missing packages)
-    && dnf install -y liberation-mono-fonts liberation-sans-fonts liberation-serif-fonts || true \
-    && dnf install -y dejavu-sans-fonts || true \
-    # Clean up
-    && dnf clean all \
-    && rm -rf /var/cache/dnf
+    # Required for headless operation
+    libxinerama1 \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv \
+    # Verify installation
+    && /usr/bin/libreoffice --version \
+    && echo "LibreOffice installed successfully"
+
+# Set LibreOffice binary path
+ENV LIBREOFFICE_BIN=/usr/bin/libreoffice
 
 # Copy Python wheels and install
 COPY --from=builder /build/wheels /tmp/wheels
 RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
 
 # Copy application code
-COPY app/ ${LAMBDA_TASK_ROOT}/app/
-
-# Set environment variables
-ENV PYTHONPATH=${LAMBDA_TASK_ROOT} \
-    PYTHONUNBUFFERED=1 \
-    TEMP_DIR=/tmp/converter \
-    LOG_LEVEL=INFO \
-    # LibreOffice needs a writable home directory
-    HOME=/tmp
+COPY app/ /var/task/app/
 
 # Create temp directory
 RUN mkdir -p /tmp/converter
 
-# Set the Lambda handler
-# This points to the handler function in app/main.py
-CMD ["app.main.handler"]
+# Set environment variables
+ENV PYTHONPATH=/var/task \
+    PYTHONUNBUFFERED=1 \
+    TEMP_DIR=/tmp/converter \
+    LOG_LEVEL=INFO \
+    HOME=/tmp
 
+# Lambda Runtime Interface Client entrypoint
+ENTRYPOINT ["python", "-m", "awslambdaric"]
+
+# Handler
+CMD ["app.main.handler"]

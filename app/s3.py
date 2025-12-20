@@ -28,9 +28,11 @@ class S3Client:
         if settings.s3_endpoint_url:
             client_kwargs["endpoint_url"] = settings.s3_endpoint_url
 
-        if settings.aws_access_key_id and settings.aws_secret_access_key:
-            client_kwargs["aws_access_key_id"] = settings.aws_access_key_id
-            client_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+        # Only use explicit credentials if S3_ACCESS_KEY_ID is set (local dev)
+        # On Lambda, these are None and boto3 uses the execution role automatically
+        if settings.s3_access_key_id and settings.s3_secret_access_key:
+            client_kwargs["aws_access_key_id"] = settings.s3_access_key_id
+            client_kwargs["aws_secret_access_key"] = settings.s3_secret_access_key
 
         self._client = boto3.client("s3", **client_kwargs)
 

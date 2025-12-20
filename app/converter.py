@@ -1,7 +1,6 @@
 """LibreOffice conversion logic for PPTX to PDF."""
 
 import asyncio
-import os
 import shutil
 from pathlib import Path
 
@@ -33,7 +32,7 @@ class LibreOfficeConverter:
         Initialize converter.
 
         Args:
-            libreoffice_bin: Path to soffice binary
+            libreoffice_bin: Path to LibreOffice binary (from LIBREOFFICE_BIN env var)
             timeout_seconds: Maximum conversion time before timeout
         """
         self._bin = libreoffice_bin
