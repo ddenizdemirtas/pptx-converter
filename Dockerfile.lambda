@@ -27,24 +27,23 @@ LABEL org.opencontainers.image.title="PPTX Converter Service (Lambda)"
 LABEL org.opencontainers.image.description="Converts PPTX files to PDF using LibreOffice - Lambda version"
 
 # Install LibreOffice and fonts
-# Note: Lambda base image uses Amazon Linux, so we use yum/dnf
-RUN dnf install -y \
-    # LibreOffice
+# Note: Lambda base image uses Amazon Linux 2023, LibreOffice requires EPEL
+# Lambda image has curl-minimal pre-installed, use it directly (don't install full curl - conflicts!)
+RUN curl -LO https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm \
+    && rpm -ivh epel-release-latest-9.noarch.rpm \
+    && rm -f epel-release-latest-9.noarch.rpm \
+    # Install LibreOffice from EPEL
+    && dnf install -y \
     libreoffice-core \
     libreoffice-impress \
     libreoffice-writer \
-    # Fonts
-    liberation-fonts \
-    dejavu-fonts-common \
-    dejavu-sans-fonts \
-    google-noto-fonts-common \
-    google-noto-sans-cjk-ttc-fonts \
     fontconfig \
+    # Install available fonts (ignore errors for missing packages)
+    && dnf install -y liberation-mono-fonts liberation-sans-fonts liberation-serif-fonts || true \
+    && dnf install -y dejavu-sans-fonts || true \
     # Clean up
     && dnf clean all \
-    && rm -rf /var/cache/dnf \
-    # Update font cache
-    && fc-cache -fv
+    && rm -rf /var/cache/dnf
 
 # Copy Python wheels and install
 COPY --from=builder /build/wheels /tmp/wheels
