@@ -1,6 +1,7 @@
 # FastAPI and ASGI server
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
+mangum==0.19.0  # Lambda adapter for ASGI apps
 
 # S3 integration
 boto3==1.35.76

@@ -7,6 +7,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from mangum import Mangum
 
 from app.api import router
 from app.config import settings
@@ -91,3 +92,35 @@ app.include_router(router)
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": settings.service_name}
+
+
+# =============================================================================
+# AWS Lambda Handler
+# =============================================================================
+
+# Wrap FastAPI app with Mangum for Lambda compatibility
+_mangum_handler = Mangum(app, lifespan="auto")
+
+
+def handler(event, context):
+    """
+    AWS Lambda entry point.
+
+    Supports:
+    - Regular API Gateway / ALB requests (routed to FastAPI)
+    - Scheduled warming events (returns immediately to keep container warm)
+    """
+    logger = structlog.get_logger()
+
+    # Check if this is a warming ping (CloudWatch scheduled event)
+    if event.get("source") == "aws.events" or event.get("detail-type") == "Scheduled Event":
+        logger.info("Received warming ping, keeping container warm")
+        return {"statusCode": 200, "body": "warm"}
+
+    # Check for custom warming event (alternative pattern)
+    if event.get("warming") is True or event.get("source") == "warmup":
+        logger.info("Received custom warming ping")
+        return {"statusCode": 200, "body": "warm"}
+
+    # Regular request - route to FastAPI via Mangum
+    return _mangum_handler(event, context)

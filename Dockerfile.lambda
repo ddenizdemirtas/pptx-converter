@@ -1,0 +1,70 @@
+# PPTX Converter Service - AWS Lambda Container Image
+# Based on AWS Lambda Python base image with LibreOffice added
+
+# =============================================================================
+# Stage 1: Build LibreOffice layer
+# =============================================================================
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and build Python wheels
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+# =============================================================================
+# Stage 2: Lambda runtime image
+# =============================================================================
+FROM public.ecr.aws/lambda/python:3.12
+
+# Labels
+LABEL org.opencontainers.image.title="PPTX Converter Service (Lambda)"
+LABEL org.opencontainers.image.description="Converts PPTX files to PDF using LibreOffice - Lambda version"
+
+# Install LibreOffice and fonts
+# Note: Lambda base image uses Amazon Linux, so we use yum/dnf
+RUN dnf install -y \
+    # LibreOffice
+    libreoffice-core \
+    libreoffice-impress \
+    libreoffice-writer \
+    # Fonts
+    liberation-fonts \
+    dejavu-fonts-common \
+    dejavu-sans-fonts \
+    google-noto-fonts-common \
+    google-noto-sans-cjk-ttc-fonts \
+    fontconfig \
+    # Clean up
+    && dnf clean all \
+    && rm -rf /var/cache/dnf \
+    # Update font cache
+    && fc-cache -fv
+
+# Copy Python wheels and install
+COPY --from=builder /build/wheels /tmp/wheels
+RUN pip install --no-cache-dir /tmp/wheels/* && rm -rf /tmp/wheels
+
+# Copy application code
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+
+# Set environment variables
+ENV PYTHONPATH=${LAMBDA_TASK_ROOT} \
+    PYTHONUNBUFFERED=1 \
+    TEMP_DIR=/tmp/converter \
+    LOG_LEVEL=INFO \
+    # LibreOffice needs a writable home directory
+    HOME=/tmp
+
+# Create temp directory
+RUN mkdir -p /tmp/converter
+
+# Set the Lambda handler
+# This points to the handler function in app/main.py
+CMD ["app.main.handler"]
+
